@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>독서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border: 2px solid #000;
+            border-radius: 10px;
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #000;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #000;
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #000;
+            border-radius: 5px;
+        }
+
+        .form-group input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #000;
+            border-radius: 3px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .form-group button {
+            padding: 8px 15px;
+            border: 2px solid #000;
+            background-color: white;
+            color: #000;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 40px;
+        }
+
+        .form-group button:hover {
+            background-color: #f0f0f0;
+        }
+
+        .form-group button:active {
+            background-color: #e0e0e0;
+        }
+
+        .items-list {
+            margin-top: 20px;
+        }
+
+        .item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #000;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .item-content {
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .item-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .item-buttons button {
+            padding: 5px 10px;
+            border: 1px solid #000;
+            background-color: white;
+            color: #000;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .item-buttons button:hover {
+            background-color: #f0f0f0;
+        }
+
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #000;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>독서</h1>
+        </div>
+
+        <div id="message" class="message" style="display: none;"></div>
+
+        <div class="section">
+            <h2>독서</h2>
+            <div class="form-group">
+                <input type="text" id="bookInput" placeholder="입력">
+                <button onclick="createItem()">C</button>
+            </div>
+            <div class="items-list" id="booksList"></div>
+        </div>
+    </div>
+
+    <script>
+        // 데이터 저장소 (localStorage 사용)
+        let books = [];
+        let currentId = 1;
+
+        // 페이지 로드시 데이터 불러오기
+        function loadData() {
+            const savedBooks = localStorage.getItem('books');
+            const savedId = localStorage.getItem('currentId');
+            
+            if (savedBooks) {
+                books = JSON.parse(savedBooks);
+            }
+            if (savedId) {
+                currentId = parseInt(savedId);
+            }
+        }
+
+        // 데이터 저장하기
+        function saveData() {
+            localStorage.setItem('books', JSON.stringify(books));
+            localStorage.setItem('currentId', currentId.toString());
+        }
+
+        // 메시지 표시
+        function showMessage(text) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Create 기능
+        function createItem() {
+            const input = document.getElementById('bookInput');
+            const value = input.value.trim();
+            
+            if (value === '') {
+                showMessage('내용을 입력해주세요.');
+                return;
+            }
+
+            const newItem = {
+                id: currentId++,
+                content: value,
+                createdAt: new Date().toLocaleString()
+            };
+
+            books.push(newItem);
+            input.value = '';
+            saveData();
+            renderItems();
+            showMessage('항목이 추가되었습니다.');
+        }
+
+        // Update 기능
+        function updateItem(id) {
+            const item = books.find(item => item.id === id);
+            if (!item) return;
+
+            const newContent = prompt('새로운 내용을 입력하세요:', item.content);
+            if (newContent !== null && newContent.trim() !== '') {
+                item.content = newContent.trim();
+                item.updatedAt = new Date().toLocaleString();
+                saveData();
+                renderItems();
+                showMessage('항목이 수정되었습니다.');
+            }
+        }
+
+        // Delete 기능
+        function deleteItem(id) {
+            if (confirm('이 항목을 삭제하시겠습니까?')) {
+                books = books.filter(item => item.id !== id);
+                saveData();
+                renderItems();
+                showMessage('항목이 삭제되었습니다.');
+            }
+        }
+
+        // 항목 렌더링 (최신 순으로 정렬)
+        function renderItems() {
+            const listElement = document.getElementById('booksList');
+            listElement.innerHTML = '';
+            
+            // 최신순으로 정렬 (id가 높은 순서대로)
+            const sortedBooks = [...books].sort((a, b) => b.id - a.id);
+            
+            sortedBooks.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item';
+                itemDiv.innerHTML = `
+                    <div class="item-content">
+                        <strong>${item.content}</strong>
+                        <br>
+                        <small>생성: ${item.createdAt}${item.updatedAt ? ' | 수정: ' + item.updatedAt : ''}</small>
+                    </div>
+                    <div class="item-buttons">
+                        <button onclick="updateItem(${item.id})">U</button>
+                        <button onclick="deleteItem(${item.id})">D</button>
+                    </div>
+                `;
+                listElement.appendChild(itemDiv);
+            });
+        }
+
+        // Enter 키 이벤트 처리
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id === 'bookInput') {
+                createItem();
+            }
+        });
+
+        // 페이지 로드시 초기화
+        window.addEventListener('load', function() {
+            loadData();
+            renderItems();
+        });
+    </script>
+</body>
+</html>
