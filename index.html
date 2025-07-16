@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>독서 앱 - 디버깅 버전</title>
+    <title>독서 앱 - Realtime Database</title>
     <style>
         * {
             margin: 0;
@@ -188,7 +188,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>독서 앱 - 디버깅 버전</h1>
+            <h1>독서 앱 - Realtime Database</h1>
         </div>
 
         <div id="debugInfo" class="debug-info">
@@ -199,8 +199,8 @@
 
         <div class="test-buttons">
             <button onclick="testFirebaseConnection()">Firebase 연결 테스트</button>
-            <button onclick="testFirestoreWrite()">Firestore 쓰기 테스트</button>
-            <button onclick="testFirestoreRead()">Firestore 읽기 테스트</button>
+            <button onclick="testDatabaseWrite()">Database 쓰기 테스트</button>
+            <button onclick="testDatabaseRead()">Database 읽기 테스트</button>
             <button onclick="clearDebugLog()">로그 지우기</button>
         </div>
 
@@ -211,7 +211,7 @@
             <h2>독서 목록</h2>
             <div class="form-group">
                 <input type="text" id="bookInput" placeholder="책 제목을 입력하세요">
-                <button onclick="createItem()" id="createBtn">추가</button>
+                <button onclick="createItem()" id="createBtn">C</button>
             </div>
             <div class="items-list" id="booksList">
                 <div class="item">
@@ -221,14 +221,14 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK for Realtime Database -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
     <script>
         // 전역 변수
-        let db = null;
-        let books = [];
+        let database = null;
+        let books = {};
         let currentId = 1;
         let isFirebaseInitialized = false;
 
@@ -240,7 +240,8 @@
             storageBucket: "reading-edef5.firebasestorage.app",
             messagingSenderId: "663088333424",
             appId: "1:663088333424:web:125bdc81dc396e4d61aab5",
-            measurementId: "G-2CZNLP6N09"
+            measurementId: "G-2CZNLP6N09",
+            databaseURL: "https://reading-edef5-default-rtdb.asia-southeast1.firebasedatabase.app/"
         };
 
         // 디버그 로그 함수
@@ -281,9 +282,9 @@
                     debugLog('Firebase 앱이 이미 초기화됨');
                 }
 
-                // Firestore 초기화
-                db = firebase.firestore();
-                debugLog('Firestore 초기화 완료');
+                // Realtime Database 초기화
+                database = firebase.database();
+                debugLog('Realtime Database 초기화 완료');
                 
                 updateFirebaseStatus('초기화 완료');
                 isFirebaseInitialized = true;
@@ -311,9 +312,21 @@
                 const app = firebase.app();
                 debugLog(`Firebase 앱 이름: ${app.name}`);
                 debugLog(`Firebase 프로젝트 ID: ${app.options.projectId}`);
+                debugLog(`Database URL: ${app.options.databaseURL}`);
                 
-                updateConnectionStatus('연결 확인됨');
-                showMessage('Firebase 연결 성공!', 'success');
+                // 연결 상태 확인
+                const connectedRef = database.ref('.info/connected');
+                connectedRef.once('value', (snapshot) => {
+                    if (snapshot.val() === true) {
+                        debugLog('Realtime Database 연결 확인됨');
+                        updateConnectionStatus('연결됨');
+                        showMessage('Firebase 연결 성공!', 'success');
+                    } else {
+                        debugLog('Realtime Database 연결 안됨');
+                        updateConnectionStatus('연결 안됨');
+                        showMessage('Firebase 연결 실패', 'error');
+                    }
+                });
             } catch (error) {
                 debugLog(`Firebase 연결 테스트 오류: ${error.message}`, 'error');
                 updateConnectionStatus('연결 실패');
@@ -321,9 +334,9 @@
             }
         }
 
-        // Firestore 쓰기 테스트
-        async function testFirestoreWrite() {
-            debugLog('Firestore 쓰기 테스트 시작...');
+        // Database 쓰기 테스트
+        async function testDatabaseWrite() {
+            debugLog('Database 쓰기 테스트 시작...');
             
             if (!isFirebaseInitialized) {
                 showMessage('Firebase가 초기화되지 않았습니다.', 'error');
@@ -333,22 +346,22 @@
             try {
                 const testData = {
                     test: true,
-                    message: 'Firestore 연결 테스트',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    message: 'Database 연결 테스트',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
                 };
 
-                await db.collection('test').add(testData);
-                debugLog('Firestore 쓰기 테스트 성공');
-                showMessage('Firestore 쓰기 테스트 성공!', 'success');
+                await database.ref('test').push(testData);
+                debugLog('Database 쓰기 테스트 성공');
+                showMessage('Database 쓰기 테스트 성공!', 'success');
             } catch (error) {
-                debugLog(`Firestore 쓰기 테스트 오류: ${error.message}`, 'error');
-                showMessage(`Firestore 쓰기 실패: ${error.message}`, 'error');
+                debugLog(`Database 쓰기 테스트 오류: ${error.message}`, 'error');
+                showMessage(`Database 쓰기 실패: ${error.message}`, 'error');
             }
         }
 
-        // Firestore 읽기 테스트
-        async function testFirestoreRead() {
-            debugLog('Firestore 읽기 테스트 시작...');
+        // Database 읽기 테스트
+        async function testDatabaseRead() {
+            debugLog('Database 읽기 테스트 시작...');
             
             if (!isFirebaseInitialized) {
                 showMessage('Firebase가 초기화되지 않았습니다.', 'error');
@@ -356,12 +369,15 @@
             }
 
             try {
-                const snapshot = await db.collection('books').limit(1).get();
-                debugLog(`Firestore 읽기 테스트 성공, 문서 수: ${snapshot.size}`);
-                showMessage(`Firestore 읽기 테스트 성공! (문서 수: ${snapshot.size})`, 'success');
+                const snapshot = await database.ref('books').limitToLast(1).once('value');
+                const data = snapshot.val();
+                const count = data ? Object.keys(data).length : 0;
+                
+                debugLog(`Database 읽기 테스트 성공, 문서 수: ${count}`);
+                showMessage(`Database 읽기 테스트 성공! (문서 수: ${count})`, 'success');
             } catch (error) {
-                debugLog(`Firestore 읽기 테스트 오류: ${error.message}`, 'error');
-                showMessage(`Firestore 읽기 실패: ${error.message}`, 'error');
+                debugLog(`Database 읽기 테스트 오류: ${error.message}`, 'error');
+                showMessage(`Database 읽기 실패: ${error.message}`, 'error');
             }
         }
 
@@ -399,20 +415,19 @@
             
             try {
                 debugLog('데이터 로딩 시작...');
-                const snapshot = await db.collection('books').orderBy('createdAt', 'desc').get();
+                const snapshot = await database.ref('books').orderByChild('createdAt').once('value');
+                const data = snapshot.val();
                 
-                books = [];
-                snapshot.forEach((doc) => {
-                    books.push({
-                        id: doc.id,
-                        ...doc.data()
-                    });
-                });
+                books = data || {};
+                const booksArray = Object.keys(books).map(key => ({
+                    id: key,
+                    ...books[key]
+                }));
                 
-                debugLog(`데이터 로딩 완료, 총 ${books.length}개 항목`);
+                debugLog(`데이터 로딩 완료, 총 ${booksArray.length}개 항목`);
                 
-                if (books.length > 0) {
-                    const maxId = Math.max(...books.map(book => parseInt(book.numericId) || 0));
+                if (booksArray.length > 0) {
+                    const maxId = Math.max(...booksArray.map(book => parseInt(book.numericId) || 0));
                     currentId = maxId + 1;
                 }
                 
@@ -443,13 +458,13 @@
             const newItem = {
                 numericId: currentId++,
                 content: value,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
                 createdAtString: new Date().toLocaleString('ko-KR')
             };
 
             try {
                 debugLog(`새 항목 추가: ${value}`);
-                await db.collection('books').add(newItem);
+                await database.ref('books').push(newItem);
                 input.value = '';
                 showMessage('항목이 추가되었습니다.', 'success');
             } catch (error) {
@@ -460,15 +475,15 @@
 
         // 아이템 수정
         async function updateItem(id) {
-            const book = books.find(item => item.id === id);
+            const book = books[id];
             if (!book) return;
 
             const newContent = prompt('새로운 내용을 입력하세요:', book.content);
             if (newContent !== null && newContent.trim() !== '') {
                 try {
-                    await db.collection('books').doc(id).update({
+                    await database.ref(`books/${id}`).update({
                         content: newContent.trim(),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.database.ServerValue.TIMESTAMP,
                         updatedAtString: new Date().toLocaleString('ko-KR')
                     });
                     showMessage('항목이 수정되었습니다.', 'success');
@@ -483,7 +498,7 @@
         async function deleteItem(id) {
             if (confirm('이 항목을 삭제하시겠습니까?')) {
                 try {
-                    await db.collection('books').doc(id).delete();
+                    await database.ref(`books/${id}`).remove();
                     showMessage('항목이 삭제되었습니다.', 'success');
                 } catch (error) {
                     debugLog(`항목 삭제 오류: ${error.message}`, 'error');
@@ -497,12 +512,20 @@
             const listElement = document.getElementById('booksList');
             listElement.innerHTML = '';
             
-            if (books.length === 0) {
+            const booksArray = Object.keys(books).map(key => ({
+                id: key,
+                ...books[key]
+            }));
+
+            if (booksArray.length === 0) {
                 listElement.innerHTML = '<div class="item"><div class="item-content">등록된 책이 없습니다.</div></div>';
                 return;
             }
 
-            books.forEach(item => {
+            // 생성 시간 기준으로 정렬 (최신순)
+            booksArray.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+            booksArray.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'item';
                 itemDiv.innerHTML = `
@@ -512,8 +535,8 @@
                         <small>생성: ${item.createdAtString || '알 수 없음'}${item.updatedAtString ? ' | 수정: ' + item.updatedAtString : ''}</small>
                     </div>
                     <div class="item-buttons">
-                        <button onclick="updateItem('${item.id}')">수정</button>
-                        <button onclick="deleteItem('${item.id}')">삭제</button>
+                        <button onclick="updateItem('${item.id}')">U</button>
+                        <button onclick="deleteItem('${item.id}')">D</button>
                     </div>
                 `;
                 listElement.appendChild(itemDiv);
@@ -534,16 +557,13 @@
                 return;
             }
 
-            db.collection('books').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
-                books = [];
-                snapshot.forEach((doc) => {
-                    books.push({
-                        id: doc.id,
-                        ...doc.data()
-                    });
-                });
+            database.ref('books').on('value', (snapshot) => {
+                const data = snapshot.val();
+                books = data || {};
                 renderItems();
-                debugLog(`실시간 업데이트: ${books.length}개 항목`);
+                
+                const count = Object.keys(books).length;
+                debugLog(`실시간 업데이트: ${count}개 항목`);
             }, (error) => {
                 debugLog(`실시간 업데이트 오류: ${error.message}`, 'error');
                 showMessage('실시간 업데이트 중 오류가 발생했습니다.', 'error');
