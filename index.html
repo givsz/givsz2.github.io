@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -133,6 +133,24 @@
             background-color: #f9f9f9;
             text-align: center;
         }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-color: #c62828;
+        }
+
+        .success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            border-color: #2e7d32;
+        }
     </style>
 </head>
 <body>
@@ -142,6 +160,7 @@
         </div>
 
         <div id="message" class="message" style="display: none;"></div>
+        <div id="loading" class="loading">로딩 중...</div>
 
         <div class="section">
             <h2>독서</h2>
@@ -153,34 +172,36 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <script>
-        // 데이터 저장소 (localStorage 사용)
+        // Firebase 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1Wsi8L8KggOS1hv-UiXYF_2GIlkuxjew",
+            authDomain: "reading-edef5.firebaseapp.com",
+            projectId: "reading-edef5",
+            storageBucket: "reading-edef5.firebasestorage.app",
+            messagingSenderId: "663088333424",
+            appId: "1:663088333424:web:125bdc81dc396e4d61aab5",
+            measurementId: "G-2CZNLP6N09",
+            databaseURL: "https://reading-edef5-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        };
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // 데이터 저장소
         let books = [];
         let currentId = 1;
 
-        // 페이지 로드시 데이터 불러오기
-        function loadData() {
-            const savedBooks = localStorage.getItem('books');
-            const savedId = localStorage.getItem('currentId');
-            
-            if (savedBooks) {
-                books = JSON.parse(savedBooks);
-            }
-            if (savedId) {
-                currentId = parseInt(savedId);
-            }
-        }
-
-        // 데이터 저장하기
-        function saveData() {
-            localStorage.setItem('books', JSON.stringify(books));
-            localStorage.setItem('currentId', currentId.toString());
-        }
-
         // 메시지 표시
-        function showMessage(text) {
+        function showMessage(text, type = 'info') {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
             messageDiv.style.display = 'block';
             
             setTimeout(() => {
@@ -188,77 +209,149 @@
             }, 3000);
         }
 
+        // 로딩 상태 관리
+        function setLoading(isLoading) {
+            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
+        }
+
+        // Firestore에서 데이터 불러오기
+        async function loadData() {
+            try {
+                const snapshot = await db.collection('books').orderBy('createdAt', 'desc').get();
+                books = [];
+                
+                snapshot.forEach((doc) => {
+                    books.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                // 현재 최대 ID 찾기
+                if (books.length > 0) {
+                    const maxId = Math.max(...books.map(book => parseInt(book.numericId) || 0));
+                    currentId = maxId + 1;
+                }
+                
+                renderItems();
+                setLoading(false);
+            } catch (error) {
+                console.error('데이터 로드 오류:', error);
+                showMessage('데이터를 불러오는 중 오류가 발생했습니다.', 'error');
+                setLoading(false);
+            }
+        }
+
         // Create 기능
-        function createItem() {
+        async function createItem() {
             const input = document.getElementById('bookInput');
             const value = input.value.trim();
             
             if (value === '') {
-                showMessage('내용을 입력해주세요.');
+                showMessage('내용을 입력해주세요.', 'error');
                 return;
             }
 
             const newItem = {
-                id: currentId++,
+                numericId: currentId++,
                 content: value,
-                createdAt: new Date().toLocaleString()
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdAtString: new Date().toLocaleString('ko-KR')
             };
 
-            books.push(newItem);
-            input.value = '';
-            saveData();
-            renderItems();
-            showMessage('항목이 추가되었습니다.');
+            try {
+                await db.collection('books').add(newItem);
+                input.value = '';
+                showMessage('항목이 추가되었습니다.', 'success');
+            } catch (error) {
+                console.error('항목 추가 오류:', error);
+                showMessage('항목 추가 중 오류가 발생했습니다.', 'error');
+            }
         }
 
         // Update 기능
-        function updateItem(id) {
-            const item = books.find(item => item.id === id);
-            if (!item) return;
+        async function updateItem(id) {
+            const book = books.find(item => item.id === id);
+            if (!book) return;
 
-            const newContent = prompt('새로운 내용을 입력하세요:', item.content);
+            const newContent = prompt('새로운 내용을 입력하세요:', book.content);
             if (newContent !== null && newContent.trim() !== '') {
-                item.content = newContent.trim();
-                item.updatedAt = new Date().toLocaleString();
-                saveData();
-                renderItems();
-                showMessage('항목이 수정되었습니다.');
+                try {
+                    await db.collection('books').doc(id).update({
+                        content: newContent.trim(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAtString: new Date().toLocaleString('ko-KR')
+                    });
+                    showMessage('항목이 수정되었습니다.', 'success');
+                } catch (error) {
+                    console.error('항목 수정 오류:', error);
+                    showMessage('항목 수정 중 오류가 발생했습니다.', 'error');
+                }
             }
         }
 
         // Delete 기능
-        function deleteItem(id) {
+        async function deleteItem(id) {
             if (confirm('이 항목을 삭제하시겠습니까?')) {
-                books = books.filter(item => item.id !== id);
-                saveData();
-                renderItems();
-                showMessage('항목이 삭제되었습니다.');
+                try {
+                    await db.collection('books').doc(id).delete();
+                    showMessage('항목이 삭제되었습니다.', 'success');
+                } catch (error) {
+                    console.error('항목 삭제 오류:', error);
+                    showMessage('항목 삭제 중 오류가 발생했습니다.', 'error');
+                }
             }
         }
 
-        // 항목 렌더링 (최신 순으로 정렬)
+        // 항목 렌더링
         function renderItems() {
             const listElement = document.getElementById('booksList');
             listElement.innerHTML = '';
             
-            // 최신순으로 정렬 (id가 높은 순서대로)
-            const sortedBooks = [...books].sort((a, b) => b.id - a.id);
-            
-            sortedBooks.forEach(item => {
+            if (books.length === 0) {
+                listElement.innerHTML = '<div class="item"><div class="item-content">등록된 책이 없습니다.</div></div>';
+                return;
+            }
+
+            books.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'item';
                 itemDiv.innerHTML = `
                     <div class="item-content">
-                        <strong>${item.content}</strong>
+                        <strong>${escapeHtml(item.content)}</strong>
                         <br>
-                        <small>생성: ${item.createdAt}${item.updatedAt ? ' | 수정: ' + item.updatedAt : ''}</small>
+                        <small>생성: ${item.createdAtString || '알 수 없음'}${item.updatedAtString ? ' | 수정: ' + item.updatedAtString : ''}</small>
                     </div>
                     <div class="item-buttons">
-                        <button onclick="updateItem(${item.id})">U</button>
-                        <button onclick="deleteItem(${item.id})">D</button>
+                        <button onclick="updateItem('${item.id}')">U</button>
+                        <button onclick="deleteItem('${item.id}')">D</button>
                     </div>
                 `;
                 listElement.appendChild(itemDiv);
+            });
+        }
+
+        // HTML 이스케이프 함수
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 실시간 업데이트 리스너
+        function setupRealtimeListener() {
+            db.collection('books').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+                books = [];
+                snapshot.forEach((doc) => {
+                    books.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                renderItems();
+            }, (error) => {
+                console.error('실시간 업데이트 오류:', error);
+                showMessage('실시간 업데이트 중 오류가 발생했습니다.', 'error');
             });
         }
 
@@ -272,7 +365,7 @@
         // 페이지 로드시 초기화
         window.addEventListener('load', function() {
             loadData();
-            renderItems();
+            setupRealtimeListener();
         });
     </script>
 </body>
